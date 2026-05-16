@@ -1,0 +1,6 @@
+# Ignorer le dossier contenant les clés API
+.streamlit/secrets.toml
+
+# Ignorer les fichiers de cache Python
+__pycache__/
+*.pyc
