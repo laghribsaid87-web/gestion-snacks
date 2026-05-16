@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-import speech_recognition as sr
 import re
 import io
+import google.generativeai as genai
 from audio_recorder_streamlit import audio_recorder
 from datetime import datetime
 
@@ -70,19 +70,27 @@ def main():
 
     if audio_bytes:
         with st.spinner("Analyse de la voix en cours..."):
-            try:
-                r = sr.Recognizer()
-                # Utilisation d'un fichier audio en mémoire au lieu de PyAudio
-                audio_file = io.BytesIO(audio_bytes)
-                with sr.AudioFile(audio_file) as source:
-                    audio = r.record(source)
-                
-                st.session_state.texte_dicte = r.recognize_google(audio, language="fr-FR")
-                st.success("Texte capturé avec succès !")
-            except sr.UnknownValueError:
-                st.error("Désolé, je n'ai pas pu comprendre l'audio. Rapprochez-vous du micro.")
-            except sr.RequestError as e:
-                st.error(f"Erreur de connexion au service vocal : {e}")
+            if "GEMINI_API_KEY" in st.secrets:
+                try:
+                    # Configuration de l'IA Gemini
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    
+                    # Ordre strict pour Gemini
+                    prompt = "Écoute cet enregistrement audio (mélange de darija marocaine et de français). Transcris exactement ce que la personne dit sans corriger les mots en darija et sans faire de phrases, donne uniquement le texte brut (ex: viande 5 kg 500 DH...)"
+                    
+                    # Envoi de l'audio directement à l'IA
+                    reponse = model.generate_content([
+                        prompt,
+                        {"mime_type": "audio/wav", "data": audio_bytes}
+                    ])
+                    
+                    st.session_state.texte_dicte = reponse.text.strip()
+                    st.success("Texte capturé avec succès grâce à Gemini ! ✨")
+                except Exception as e:
+                    st.error(f"Erreur lors de l'analyse avec Gemini : {e}")
+            else:
+                st.error("⚠️ La clé API Gemini n'est pas configurée dans les paramètres.")
 
     texte = st.text_area("Texte brut (vous pouvez le modifier manuellement) :", value=st.session_state.texte_dicte, height=100)
     
